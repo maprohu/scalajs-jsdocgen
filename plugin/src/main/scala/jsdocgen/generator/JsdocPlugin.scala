@@ -1,11 +1,13 @@
 package jsdocgen.generator
 
+import java.util.Properties
+
+import org.scalajs.sbtplugin.ScalaJSPlugin
 import sbt._
 import Keys._
 
 object JsdocPlugin extends AutoPlugin {
 
-  override val projectSettings: Seq[Setting[_]] = baseNonameSettings
 
   object autoImport {
     lazy val jsdocGenerate = taskKey[Seq[File]]("jsdoc-generate")
@@ -34,7 +36,21 @@ object JsdocPlugin extends AutoPlugin {
 
   import autoImport._
 
-  lazy val baseNonameSettings: Seq[sbt.Def.Setting[_]] = Seq(
+  lazy val props = {
+    val p = new Properties
+    p.load(getClass.getResourceAsStream("/jsdocgen/plugin.properties"))
+    p
+  }
+  lazy val pluginVersion = props.getProperty("version")
+  lazy val pluginOrganization = props.getProperty("organization")
+  lazy val pluginLibName = props.getProperty("lib.name")
+
+  import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+
+  override def requires: Plugins = ScalaJSPlugin
+
+  override val projectSettings: Seq[Setting[_]] = Seq(
+    libraryDependencies += pluginOrganization %%% pluginLibName % pluginVersion,
     jsdocCommand := {
       if (sys.props.get("os.name").exists(_.toLowerCase().contains("windows")))
         Seq("cmd", "/C", "jsdoc")
