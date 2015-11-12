@@ -1,11 +1,9 @@
 package jsdocgen.generator
 
-import java.io.{PrintWriter, FileOutputStream, File}
 import java.net.URI
 
 import sbt._
 
-import scala.util.Properties
 
 /**
  * Created by pappmar on 12/11/2015.
@@ -39,7 +37,7 @@ object JsdocInvoker {
     ) #> out !
 
     println("jsdoc complete.")
-    
+
     out
   }
 
