@@ -25,7 +25,9 @@ object Generator {
   )
 
   val keyword = Set(
-    "type"
+    "type",
+    "val",
+    "object"
   )
   def isReserved(name: String) = reserved.contains(name)
 
@@ -44,7 +46,10 @@ object Generator {
     println("reading json: " + docletsFile)
     val doclets = {
       val json = Source.fromFile(docletsFile, "UTF-8").mkString
-      read[Seq[Doclet]](json)
+      import CodeValue._
+//      read[Seq[Doclet]](json)
+
+      Seq()
     }
 
     generate(
@@ -89,6 +94,7 @@ object Generator {
         case d : domain.Member => d
       })
 
+
     val packageList = (o:String) =>
       Option(o).map(_.split('.').toSeq).getOrElse(Seq())
 
@@ -99,6 +105,12 @@ object Generator {
     val classByParent = classes.groupBy(parentProp).withDefaultValue(Seq())
     val typedefByParent = typedefs.groupBy(parentProp).withDefaultValue(Seq())
     val memberByParent = members.groupBy(parentProp).withDefaultValue(Seq())
+
+//    val googTypedefs = for {
+//      ns <- namespaces
+//      m <- memberByParent(ns)
+//      if m.meta.code.value == "goog.typedef"
+//    } yield m
 
     val typedefByName : Map[String, Typedef] = typedefs.map(td => td.longname -> td)(scala.collection.breakOut)
 

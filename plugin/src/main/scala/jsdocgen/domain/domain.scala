@@ -1,10 +1,23 @@
 package jsdocgen.domain
 
 import jsdocgen.domain.pickle.key
+import upickle.Js
 
 case class Meta(
   filename: String,
-  path: String
+  path: String,
+  code: Code
+)
+
+trait CodeValue
+object CodeValue {
+  implicit val codeValueReader = pickle.Reader[CodeValue] {
+    case v => new CodeValue {}
+  }
+}
+
+case class Code(
+//  value: CodeValue = null
 )
 
 sealed trait Doclet
@@ -56,7 +69,8 @@ object UnknownType extends Type(
   name: String,
   longname: String,
   memberof: String = null,
-  `type`: Type = UnknownType
+  `type`: Type = UnknownType,
+  meta: Meta
 ) extends Doclet with HasParent
 
 @key("namespace") case class Namespace(
