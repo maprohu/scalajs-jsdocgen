@@ -58,7 +58,7 @@ object JsdocPlugin extends AutoPlugin {
         Seq("jsdoc")
     },
     jsdocTarget := (sourceManaged in Compile).value / "jsdocgen",
-    jsdocGlobalScope := Seq("jsdocgen"),
+    jsdocGlobalScope := Seq("jsfacade"),
     jsdocUtilScope := "pkg",
     jsdocImplicits := Seq("implicits"),
     jsdocDocletsFile := target.value / "jsdoc.json",

@@ -28,6 +28,7 @@ object JsdocInvoker {
       )
     ).get
 
+    out.getParentFile.mkdirs()
     val dir = s()
 
     (

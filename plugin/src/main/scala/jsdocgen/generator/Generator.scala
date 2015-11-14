@@ -37,7 +37,7 @@ object Generator {
   def generateFile(
     targetDir: File,
     docletsFile: File,
-    rootPackage : Seq[String] = Seq("jsdocgen"),
+    rootPackage : Seq[String] = Seq("jsfacade"),
     utilPackage : String = "pkg",
     implicits : Seq[String] = Seq("implicits")
   ) : Seq[File] = {
@@ -59,7 +59,7 @@ object Generator {
   def generate(
     targetDir: File,
     doclets: Seq[Doclet],
-    rootPackage : Seq[String] = Seq("jsdocgen"),
+    rootPackage : Seq[String] = Seq("jsfacade"),
     utilPackage : String = "pkg",
     implicits : Seq[String] = Seq("implicits")
   ) : Seq[File] = {

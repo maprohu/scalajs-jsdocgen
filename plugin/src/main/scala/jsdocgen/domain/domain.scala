@@ -36,12 +36,12 @@ trait HasType {
 }
 
 case class Param(
-  `type`: Type,
+  `type`: Type = Type(Seq()),
   name: String
 ) extends HasType
 
 case class Return(
-  `type`: Type
+  `type`: Type = Type(Seq())
 ) extends HasType
 
 case class Type(

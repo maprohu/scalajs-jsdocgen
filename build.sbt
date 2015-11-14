@@ -1,20 +1,8 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 val githubRepo = "scalajs-jsdocgen"
 
-lazy val props = {
-  val p = new Properties
-  p.load(new FileInputStream(file("plugin/src/main/resources/jsdocgen/plugin.properties")))
-  p
-}
-lazy val pluginVersion = props.getProperty("version")
-lazy val pluginOrganization = props.getProperty("organization")
-lazy val pluginLibName = props.getProperty("lib.name")
-
 val commonSettings = Seq(
-  organization := pluginOrganization,
-  version := pluginVersion,
+  organization := "com.github.maprohu",
+  version := "0.1.1-SNAPSHOT",
   publishMavenStyle := true,
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
@@ -57,7 +45,18 @@ lazy val plugin = project
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "upickle" % "0.3.6",
       "org.scalamacros" %% s"quasiquotes" % "2.0.0" % "provided"
-    )
+    ),
+    resourceGenerators in Compile += Def.task {
+      val out = (resourceManaged in Compile).value / "jsdocgen" / "plugin.properties"
+      IO.write(out,
+      s"""organization = ${organization.value}
+          |lib.name = ${(name in lib).value}
+          |version = ${version.value}
+      """.stripMargin
+      )
+      Seq(out)
+    }.taskValue
+
 
   )
 
@@ -66,7 +65,7 @@ lazy val lib = project
   .settings(commonSettings)
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    name := pluginLibName,
+    name := "jsdocgen-lib",
     publishArtifact in (Compile, packageDoc) := false,
     scalaVersion := "2.11.7"
   )
