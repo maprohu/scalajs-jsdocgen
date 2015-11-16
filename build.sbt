@@ -1,5 +1,7 @@
 val githubRepo = "scalajs-jsdocgen"
 
+val jacksonVersion = "2.6.3"
+
 val commonSettings = Seq(
   organization := "com.github.maprohu",
   version := "0.1.1-SNAPSHOT",
@@ -43,7 +45,8 @@ lazy val plugin = project
     publishArtifact in (Compile, packageDoc) := false,
     addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.5"),
     libraryDependencies ++= Seq(
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.6.3",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
+      "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
       "com.lihaoyi" %% "upickle" % "0.3.6",
       "org.scalamacros" %% "quasiquotes" % "2.0.0" % "provided"
     ),
