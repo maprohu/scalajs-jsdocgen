@@ -3,8 +3,7 @@ package jsdocgen.generator
 import java.io.{File, PrintWriter}
 
 
-import jsdocgen._
-import jsdocgen.domain.pickle._
+import jsdocgen.domain
 import jsdocgen.domain._
 import scala.collection.breakOut
 
@@ -36,7 +35,7 @@ object Generator {
     else if (keyword.contains(from)) s"`$from`"
     else from
 
-  def generateFile(
+  def generateFromFile(
     targetDir: File,
     docletsFile: File,
     rootPackage : Seq[String] = Seq("jsfacade"),
@@ -54,12 +53,8 @@ object Generator {
     )
   }
 
-  def readDoclets(json: String) = {
-    implicit val jsAnyReader = pickle.Reader[JsAny] {
-      case v => JsAny(v)
-    }
-
-    jsdocgen.domain.pickle.read[Seq[jsdocgen.domain.Doclet]](json)
+  def readDoclets(json: String) : Seq[Doclet] = {
+    JsonUtil.fromJson[Seq[Doclet]](json)
   }
 
   def generateFromString(
@@ -238,7 +233,7 @@ object Generator {
       val superClass : String =
         cl.augments
           .flatMap(au => resolveDefined(au).map(_.head))
-          .getOrElse("scala.scalajs.js.Object")
+          .headOption.getOrElse("scala.scalajs.js.Object")
 
       write(s"class ${cl.name} extends $superClass {")
 

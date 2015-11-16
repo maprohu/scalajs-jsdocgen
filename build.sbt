@@ -43,8 +43,9 @@ lazy val plugin = project
     publishArtifact in (Compile, packageDoc) := false,
     addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.5"),
     libraryDependencies ++= Seq(
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.6.3",
       "com.lihaoyi" %% "upickle" % "0.3.6",
-      "org.scalamacros" %% s"quasiquotes" % "2.0.0" % "provided"
+      "org.scalamacros" %% "quasiquotes" % "2.0.0" % "provided"
     ),
     resourceGenerators in Compile += Def.task {
       val out = (resourceManaged in Compile).value / "jsdocgen" / "plugin.properties"

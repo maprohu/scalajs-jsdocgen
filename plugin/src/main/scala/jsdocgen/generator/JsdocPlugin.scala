@@ -66,7 +66,7 @@ object JsdocPlugin extends AutoPlugin {
     jsdocRunSource := None,
     jsdocRunInputs := Seq("."),
     jsdocGenerate := {
-      Generator.generateFile(
+      Generator.generateFromFile(
         jsdocTarget.value,
         jsdocDocletsFile.value,
         jsdocGlobalScope.value,
