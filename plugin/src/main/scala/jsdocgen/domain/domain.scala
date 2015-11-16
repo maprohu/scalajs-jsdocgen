@@ -9,15 +9,10 @@ case class Meta(
   code: Code
 )
 
-trait CodeValue
-object CodeValue {
-  implicit val codeValueReader = pickle.Reader[CodeValue] {
-    case v => new CodeValue {}
-  }
-}
+case class JsAny(value: Js.Value)
 
 case class Code(
-//  value: CodeValue = null
+  value: JsAny = null
 )
 
 sealed trait Doclet

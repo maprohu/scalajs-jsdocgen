@@ -12,15 +12,10 @@ import scala.io.Source
   */
 object RunGenerator extends App {
 
-   val doclets = {
-     val json = Source.fromURL(getClass.getResource("/ol3-3.10.1-jsdoc.json").toURI.toURL, "UTF-8").mkString
-     read[Seq[Doclet]](json)
-   }
 
-
-   Generator.generate(
+   Generator.generateFromString(
      new File("target/generated"),
-     doclets
+     Source.fromURL(getClass.getResource("/ol3-3.10.1-jsdoc.json").toURI.toURL, "UTF-8").mkString
    )
 
  }

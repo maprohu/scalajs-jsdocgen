@@ -14,7 +14,7 @@ object JsdocPlugin extends AutoPlugin {
 
     lazy val jsdocTarget = taskKey[File]("jsdoc-target")
 
-    lazy val jsdocDocletsFile = settingKey[File]("jsdoc-docletsfile")
+    lazy val jsdocDocletsFile = taskKey[File]("jsdoc-docletsfile")
 
     lazy val jsdocRunTarget = settingKey[File]("jsdoc-runtarget")
 
@@ -61,8 +61,8 @@ object JsdocPlugin extends AutoPlugin {
     jsdocGlobalScope := Seq("jsfacade"),
     jsdocUtilScope := "pkg",
     jsdocImplicits := Seq("implicits"),
-    jsdocDocletsFile := target.value / "jsdoc.json",
-    jsdocRunTarget := jsdocDocletsFile.value,
+    jsdocRunTarget := target.value / "jsdoc.json",
+    jsdocDocletsFile := jsdocRun.value,
     jsdocRunSource := None,
     jsdocRunInputs := Seq("."),
     jsdocGenerate := {

@@ -44,17 +44,35 @@ object Generator {
     implicits : Seq[String] = Seq("implicits")
   ) : Seq[File] = {
     println("reading json: " + docletsFile)
-    val doclets = {
-      val json = Source.fromFile(docletsFile, "UTF-8").mkString
-      import CodeValue._
-//      read[Seq[Doclet]](json)
 
-      Seq()
+    generateFromString(
+      targetDir,
+      Source.fromFile(docletsFile, "UTF-8").mkString,
+      rootPackage,
+      utilPackage,
+      implicits
+    )
+  }
+
+  def readDoclets(json: String) = {
+    implicit val jsAnyReader = pickle.Reader[JsAny] {
+      case v => JsAny(v)
     }
+
+    jsdocgen.domain.pickle.read[Seq[jsdocgen.domain.Doclet]](json)
+  }
+
+  def generateFromString(
+    targetDir: File,
+    doclets: String,
+    rootPackage : Seq[String] = Seq("jsfacade"),
+    utilPackage : String = "pkg",
+    implicits : Seq[String] = Seq("implicits")
+  ) : Seq[File] = {
 
     generate(
       targetDir,
-      doclets,
+      readDoclets(doclets),
       rootPackage,
       utilPackage,
       implicits
