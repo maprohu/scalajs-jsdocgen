@@ -34,6 +34,8 @@ trait PackageMember extends HasParent {
   def name: String
   def meta: Meta
   def longname: String
+
+  def splitName = longname.split('.')
 }
 
 
@@ -65,7 +67,10 @@ object UnknownType extends Type(
   longname: String,
   memberof: String = null,
   @JsonProperty("type") type_ : Type = UnknownType,
-  meta: Meta
+  meta: Meta,
+  scope: String,
+  undocumented: Boolean,
+  inherited: Boolean
 ) extends Doclet with HasParent with HasType
 
 @key("namespace") case class Namespace(

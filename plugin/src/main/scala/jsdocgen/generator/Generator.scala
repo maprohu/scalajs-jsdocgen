@@ -177,6 +177,16 @@ object Generator {
     def isOptional(name: domain.Type) : Boolean =
       resolveUnion(name).contains(undefinedType)
 
+
+    def resolveSingle(name: domain.Type) : String = {
+      val types = resolve(name.names.head)
+      if (types.size > 1)
+        "scala.scalajs.js.Any"
+      else
+        types.toSeq.headOption
+          .getOrElse("scala.scalajs.js.Any")
+    }
+
     def resolveType(name: domain.Type) : String = {
       val types = resolveUnion(name)
       if (types.size > 1)
@@ -245,6 +255,16 @@ object Generator {
           }).mkString(",\n")
         )
         write("  ) = this()")
+      }
+
+      for {
+        m <- memberByParent(cl.splitName)
+        if !m.inherited && !m.undocumented && m.scope == "instance" && !m.name.endsWith("[undefined]")
+      } {
+        if (isReserved(m.name))
+          write(s"""  @scala.scalajs.js.annotation.JSName("${m.name}")""")
+
+        write(s"""  var ${id(m.name)} : ${resolveSingle(m.`type`)} = scala.scalajs.js.native""")
       }
 
       write(s"}")
