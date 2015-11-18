@@ -224,7 +224,6 @@ object Generator {
 
         write(
           (for { p <- fn.params } yield {
-//            s"  ${id(p.name)} : scala.scalajs.js.UndefOr[${resolveType(p.`type`)}] = scala.scalajs.js.undefined"
             s"    ${id(p.name)} : ${resolveType(p.`type`)}" + (if (isOptional(p.`type`)) " = " + undefinedObject else "")
           }).mkString(",\n")
         )
@@ -251,7 +250,7 @@ object Generator {
         write("  def this(")
         write(
           cl.params.map({ param =>
-            s"    ${id(param.name)} : scala.scalajs.js.Any"
+            s"    ${id(param.name)} : ${resolveType(param.`type`)}"
           }).mkString(",\n")
         )
         write("  ) = this()")
@@ -267,6 +266,22 @@ object Generator {
         write(s"""  var ${id(m.name)} : ${resolveSingle(m.`type`)} = scala.scalajs.js.native""")
       }
 
+      write(s"}")
+
+      write("")
+
+      write(s"@scala.scalajs.js.native")
+      write(s"""@scala.scalajs.js.annotation.JSName("${cl.longname}")""")
+      write(s"object ${cl.name} extends scala.scalajs.js.Object {")
+      for {
+        m <- memberByParent(cl.splitName)
+        if !m.undocumented && m.scope == "static" && !m.name.endsWith("[undefined]")
+      } {
+        if (isReserved(m.name))
+          write(s"""  @scala.scalajs.js.annotation.JSName("${m.name}")""")
+
+        write(s"""  var ${id(m.name)} : ${resolveSingle(m.`type`)} = scala.scalajs.js.native""")
+      }
       write(s"}")
     }
 
@@ -293,7 +308,6 @@ object Generator {
       write(s"  def apply(")
       write(
         (for { m <- mems } yield {
-//          s"    ${id(m.name)} : scala.scalajs.js.UndefOr[${resolveType(m.`type`)}] = scala.scalajs.js.undefined"
           s"    ${id(m.name)} : ${resolveType(m.`type`)}" + (if (isOptional(m.`type`)) " = " + undefinedObject else "")
         }).mkString(",\n")
       )
@@ -334,21 +348,18 @@ object Generator {
       } {
         val name = unionTypeName(union)
 
-//        val types = resolveUnion(name)
-//        if (types.size > 1)
-//          unionTypeRef(unionTypeName(types))
-
         write(s"trait $name extends $unionClass")
 
         for {
           t <- union
         } {
           write(s"implicit def `$t -> ${name.tail}(v: $t) = new ${unionImplClass}(v) with $name")
-//          write(s"implicit def `$t -> UndefOr ${name.tail}(v: $t) : scala.scalajs.js.UndefOr[$name] = new ${unionImplClass}(v) with $name")
         }
-
-
       }
+
+
+      // TODO add class constructor param union types
+
 
 
     }
