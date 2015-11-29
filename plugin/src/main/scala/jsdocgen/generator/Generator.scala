@@ -86,7 +86,7 @@ class Generator (
   val libPackage = "jsdocgen.lib"
   val unionClassName = libPackage + ".Union"
   val unionImplClass = libPackage + ".UnionImpl"
-  val undefinedObject = libPackage + ".undefined"
+//  val undefinedObject = libPackage + ".undefined"
 
   val reserved = Set(
     "clone",
@@ -105,7 +105,7 @@ class Generator (
     else if (keyword.contains(from)) s"`$from`"
     else from
 
-  val undefinedType = undefinedObject+".type"
+//  val undefinedType = undefinedObject+".type"
   val jsAny = "scala.scalajs.js.Any"
   val jsObject = "scala.scalajs.js.Object"
 
@@ -121,33 +121,62 @@ class Generator (
 
   trait ResolvedType {
     def toSet : Set[String]
-    def join(other: ResolvedType) = ResolvedType(toSet ++ other.toSet, optional || other.optional)
+    def join(other: ResolvedType) : ResolvedType = ResolvedType(toSet ++ other.toSet, optional || other.optional)
     def optional : Boolean
     def toSingle : String
     def toJsType : String = if (optional) s"scala.scalajs.js.UndefOr[$toSingle]" else toSingle
     def toJsParamType = if (optional) s"$toJsType = scala.scalajs.js.undefined" else toJsType
-    def toWrapperType : String
-    def toWrapperParamType = if (optional) s"$toWrapperType = $undefinedObject" else toWrapperType
+
+    def toWrapperType : String = if (optional) s"scala.scalajs.js.UndefOr[$toWrapperSingle]" else toWrapperSingle
+    def toWrapperSingle : String /* = {
+      val set = (if (optional) toSet + undefinedType else toSet)
+      if (set.size == 1) set.head
+      else unionClass + "." + set.toSeq.sorted.mkString("`", "|", "`")
+    }*/
+    def toWrapperParamType = if (optional) s"$toWrapperType = scala.scalajs.js.undefined" else toWrapperType
+//    def toWrapperParamType = if (optional) s"$toWrapperType = $undefinedObject" else toWrapperType
   }
   case class SingleType(name: String, optional: Boolean = false) extends ResolvedType {
-    def toWrapperType = name
     val toSet = Set(name)
     def toSingle = name
     override def toString = name
+    override def toWrapperSingle = name
   }
   case class UnionType(names: Set[String], optional: Boolean = false) extends ResolvedType {
     def toSet = names
     def toSingle = jsAny + s" /* $generatedName */"
-    def generatedName = (if (optional) names + undefinedType else names).toSeq.sorted.mkString("`", "|", "`")
-    override def toString = toImplicitRef
-    def toImplicitRef = unionClass + "." + generatedName
-    def toWrapperType = toImplicitRef
+    def generatedName = names.toSeq.sorted.mkString("`", "|", "`")
+//    def generatedName = (if (optional) names + undefinedType else names).toSeq.sorted.mkString("`", "|", "`")
+//    override def toString = toImplicitRef
+//    def toImplicitRef = unionClass + "." + generatedName
+    def toWrapperSingle = unionClass + "." + generatedName
   }
   object OptionalType extends ResolvedType {
     def toSet = Set()
-    def toSingle = ??? // should not happen
+    def toSingle = ???
+
+    override def join(other: ResolvedType) = other match {
+      case UnkownType(_) => UnkownType(true)
+      case OptionalType => OptionalType
+      case _ => super.join(other)
+    }
+
+    // should not happen
     def optional = true
-    def toWrapperType = ??? // should not happen
+//    def toWrapperType = ??? // should not happen
+    def toWrapperSingle = ???
+  }
+  case class UnkownType(optional: Boolean) extends ResolvedType {
+    def toSet = Set(jsAny)
+    def toSingle = jsAny
+    override def toWrapperType = toJsType
+    override def toWrapperParamType = toJsParamType
+    override def join(other: ResolvedType) = other match {
+      case UnkownType(otheropt) => UnkownType(optional || otheropt)
+      case OptionalType => UnkownType(true)
+      case _ => super.join(other)
+    }
+    def toWrapperSingle = toSingle
   }
   object UnionType {
     def apply(optional: Boolean, names: String*) : UnionType = UnionType(Set(names:_*), optional)
@@ -238,7 +267,8 @@ class Generator (
 
   val builtins : Map[String, ResolvedType] = Map(
     "string" -> SingleType("java.lang.String"),
-    "number" -> UnionType(false, "scala.Byte", "scala.Short", "scala.Int", "scala.Float", "scala.Double"),
+//    "number" -> UnionType(false, "scala.Byte", "scala.Short", "scala.Int", "scala.Float", "scala.Double"),
+    "number" -> SingleType("scala.Double"),
     "Element" -> SingleType("org.scalajs.dom.raw.Element"),
     "HTMLCanvas" -> SingleType("org.scalajs.dom.raw.HTMLCanvasElement"),
     "undefined" -> OptionalType
@@ -276,7 +306,7 @@ class Generator (
         resolveDefined(name)
       )
       .getOrElse(
-        SingleType(jsAny)
+        UnkownType(false)
       )
 
   def resolveUnion(t: domain.Type) : ResolvedType = {
@@ -371,6 +401,7 @@ class Generator (
     for {
       fn <- functionByParent(nsName)
     } {
+      write(s"// ${linkSource(fn.meta)}")
       if (isReserved(fn.name))
         write(s"""@scala.scalajs.js.annotation.JSName("${fn.name}")""")
       write(s"def ${id(fn.name)}(")
@@ -388,12 +419,13 @@ class Generator (
 
       write(
         (for { p <- fn.params } yield {
-          s"  ${id(p.name)}"
+          val t = resolveParam(p)
+          s"  ${id(p.name)}.asInstanceOf[${t.toJsType}]"
         }).mkString(",\n")
       )
 
 
-      write(s")")
+      write(s").asInstanceOf[${resolveReturn(fn.returns).toWrapperType}]")
       write("")
     }
 
@@ -552,7 +584,7 @@ class Generator (
     val unionSet = memberUnions ++ staticUnions
 
     for {
-      union : UnionType <- unionSet.collect({case t:UnionType => t}).toSet
+      union : UnionType <- unionSet.collect({case t:UnionType => t.copy(optional = false)}).toSet
     } {
       val name = union.generatedName
 
