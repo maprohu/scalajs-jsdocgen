@@ -126,8 +126,11 @@ class Generator (
     def toSingle : String
     def toJsType : String = if (optional) s"scala.scalajs.js.UndefOr[$toSingle]" else toSingle
     def toJsParamType = if (optional) s"$toJsType = scala.scalajs.js.undefined" else toJsType
+    def toWrapperType : String
+    def toWrapperParamType = if (optional) s"$toWrapperType = $undefinedObject" else toWrapperType
   }
   case class SingleType(name: String, optional: Boolean = false) extends ResolvedType {
+    def toWrapperType = name
     val toSet = Set(name)
     def toSingle = name
     override def toString = name
@@ -136,12 +139,15 @@ class Generator (
     def toSet = names
     def toSingle = jsAny + s" /* $generatedName */"
     def generatedName = (if (optional) names + undefinedType else names).toSeq.sorted.mkString("`", "|", "`")
-    override def toString = unionClass + "." + generatedName
+    override def toString = toImplicitRef
+    def toImplicitRef = unionClass + "." + generatedName
+    def toWrapperType = toImplicitRef
   }
   object OptionalType extends ResolvedType {
     def toSet = Set()
     def toSingle = ??? // should not happen
     def optional = true
+    def toWrapperType = ??? // should not happen
   }
   object UnionType {
     def apply(optional: Boolean, names: String*) : UnionType = UnionType(Set(names:_*), optional)
@@ -357,6 +363,40 @@ class Generator (
       write(s"""  var ${id(m)} : ${packageJoin(ns :+ utilPackage)} = scala.scalajs.js.native""")
 
     }
+  }
+
+  def writeStaticsWrapper(nsName: Seq[String], out: Out) : Unit = {
+    import out.write
+
+    for {
+      fn <- functionByParent(nsName)
+    } {
+      if (isReserved(fn.name))
+        write(s"""@scala.scalajs.js.annotation.JSName("${fn.name}")""")
+      write(s"def ${id(fn.name)}(")
+
+      write(
+        (for { p <- fn.params } yield {
+
+          val t = resolveParam(p)
+          s"  ${id(p.name)} : ${t.toWrapperParamType}"
+
+        }).mkString(",\n")
+      )
+
+      write(s") : ${resolveReturn(fn.returns).toWrapperType} = _wrapped_.${id(fn.name)}(")
+
+      write(
+        (for { p <- fn.params } yield {
+          s"  ${id(p.name)}"
+        }).mkString(",\n")
+      )
+
+
+      write(s")")
+      write("")
+    }
+
   }
 
   def writeFunctionTypes(nsName: Seq[String], out: Out) : Unit = {
@@ -580,25 +620,54 @@ class Generator (
     import out.write
 
     write(s"package ${packageJoin(ns)}")
+
+//    if (ns.isEmpty) {
+//      write("@scala.scalajs.js.native")
+//      write(s"object ${utilPackage} extends scala.scalajs.js.GlobalScope {")
+//      writeFunctionTypes(ns, out.nest)
+//    }
+//
+//    else {
+////        write(s"""@scala.scalajs.js.annotation.JSName("${ns.mkString(".")}")""")
+//      write(s"object ${utilPackage} extends {")
+//      writeFunctionTypes(ns, out.nest)
+//      write(s"}")
+//      write("@scala.scalajs.js.native")
+//      write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
+//    }
+
     if (ns.isEmpty) {
-      write("@scala.scalajs.js.native")
-      write(s"object ${utilPackage} extends scala.scalajs.js.GlobalScope {")
-      writeFunctionTypes(ns, out.nest)
+      write(s"@scala.scalajs.js.native")
+      write(s"object global extends $utilPackage with scala.scalajs.js.GlobalScope {")
+      write(s"}")
+      write(s"")
     }
 
-    else {
-//        write(s"""@scala.scalajs.js.annotation.JSName("${ns.mkString(".")}")""")
-      write(s"object ${utilPackage} extends {")
-      writeFunctionTypes(ns, out.nest)
-      write(s"}")
-      write("@scala.scalajs.js.native")
-      write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
-    }
+    write("@scala.scalajs.js.native")
+    write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
 
     writeStatics(ns, out.nest)
 
     write(s"}")
+
     write("")
+
+    write(s"object $utilPackage {")
+
+    writeFunctionTypes(ns, out.nest)
+
+    write(s"  implicit class Wrapping(_wrapped_ : $utilPackage) {")
+    write(s"    def wrap = new Wrapper(_wrapped_)")
+    write(s"  }")
+
+    write(s"  class Wrapper(_wrapped_ : $utilPackage) {")
+
+    writeStaticsWrapper(ns, out.nest.nest)
+
+    write(s"  }")
+
+    write(s"}")
+
   }
 
 //    val globalFile = writeFile(globalObject) { out =>
