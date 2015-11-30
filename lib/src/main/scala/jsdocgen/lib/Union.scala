@@ -4,12 +4,15 @@ package jsdocgen {
 
   package object lib {
 
-    implicit def union2jsAny(value: Union) : js.Any = value.toJsAny
+//    implicit def union2jsAny(value: Union) : js.Any = value.toJsAny
 
   }
 
   package lib {
 
+    object Union {
+      implicit def union2jsAny(value: Union) : js.Any = value.toJsAny
+    }
 
     trait Union {
       def toJsAny : js.Any

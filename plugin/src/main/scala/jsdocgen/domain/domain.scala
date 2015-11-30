@@ -11,6 +11,7 @@ import upickle.Js
 case class Meta(
   filename: String,
   path: String,
+  lineno: Int,
   code: Code
 )
 
@@ -28,6 +29,10 @@ sealed trait Doclet
 
 trait HasParent {
   def memberof : String
+}
+
+trait HasAccess {
+  def access : String
 }
 
 trait PackageMember extends HasParent {
@@ -48,7 +53,11 @@ trait HasType {
 case class Param(
   @JsonProperty("type") type_ : Type = UnknownType,
   name: String
-) extends HasType
+) extends HasType {
+
+  def isOptional : Boolean = name.startsWith("opt_")
+
+}
 
 case class Return(
   @JsonProperty("type") type_ : Type = UnknownType
@@ -70,8 +79,9 @@ object UnknownType extends Type(
   meta: Meta,
   scope: String,
   undocumented: Boolean,
-  inherited: Boolean
-) extends Doclet with HasParent with HasType
+  inherited: Boolean,
+  access : String = "public"
+) extends Doclet with HasParent with HasType with HasAccess
 
 @key("namespace") case class Namespace(
   name: String,
@@ -88,16 +98,25 @@ trait HasParams {
   def params = Option(params_).getOrElse(Seq())
 }
 
+trait HasReturns {
+  def returns_ : Seq[Return]
+  def returns = Option(returns_).getOrElse(Seq()).headOption
+}
+
 @key("function") case class Function(
   name: String,
   memberof: String = null,
   scope: String,
   meta: Meta,
   longname: String,
+  undocumented: Boolean,
+  inherited: Boolean,
+  `override`: Boolean,
+  @JsonProperty("overrides") overrides_ : String,
   @JsonProperty("params") params_ : Seq[Param] = Seq(),
   @JsonProperty("returns") returns_ : Seq[Return] = Seq()
-) extends Doclet with PackageMember with HasParams {
-  def returns = Option(returns_).getOrElse(Seq()).headOption
+) extends Doclet with PackageMember with HasParams with HasReturns {
+  def overrides = Option(overrides_)
 }
 
 @key("class") case class Class(
@@ -117,8 +136,10 @@ trait HasParams {
   name: String,
   longname: String,
   memberof: String = null,
-  @JsonProperty("type") type_ : Type = UnknownType
-) extends Doclet with HasParent with DefinedType with HasType
+  @JsonProperty("type") type_ : Type = UnknownType,
+  @JsonProperty("params") params_ : Seq[Param] = Seq(),
+  @JsonProperty("returns") returns_ : Seq[Return] = Seq()
+) extends Doclet with HasParent with DefinedType with HasType with HasParams with HasReturns
 
 @key("event") case class Event(
 ) extends Doclet
