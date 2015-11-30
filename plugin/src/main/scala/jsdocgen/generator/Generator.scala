@@ -483,6 +483,8 @@ class Generator (
       m <- typedefByParent(nsName).collect {case b:Typedef => b}
       if m.`type`.names == Seq("function")
     } {
+      write(s"// ${linkSource(m.meta)}")
+
       write(s"""type ${id(m.name)} = scala.scalajs.js.Function${m.params.size}[""")
 
       for {
