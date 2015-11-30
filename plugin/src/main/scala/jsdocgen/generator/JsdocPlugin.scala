@@ -32,6 +32,10 @@ object JsdocPlugin extends AutoPlugin {
 
     lazy val jsdocRun = taskKey[File]("jsdoc-run")
 
+    lazy val jsdocSourceFileRoot = taskKey[URI]("jsdoc-source-file-root")
+
+    lazy val jsdocSourcePublishRoot = taskKey[URI]("jsdoc-source-publish-root")
+
   }
 
   import autoImport._
@@ -64,11 +68,15 @@ object JsdocPlugin extends AutoPlugin {
     jsdocRunTarget := target.value / "jsdoc.json",
     jsdocDocletsFile := jsdocRun.value,
     jsdocRunSource := None,
+    jsdocSourceFileRoot := jsdocRunSource.value.getOrElse(uri(".")),
+    jsdocSourcePublishRoot := uri(s"https://github.com/maprohu/${name.value}/blob/master/facade/src/main/javascript/"),
     jsdocRunInputs := Seq("."),
     jsdocGenerate := {
       Generator.generateFromFile(
         jsdocTarget.value,
         jsdocDocletsFile.value,
+        jsdocSourceFileRoot.value,
+        jsdocSourcePublishRoot.value,
         jsdocGlobalScope.value,
         jsdocUtilScope.value,
         jsdocImplicits.value

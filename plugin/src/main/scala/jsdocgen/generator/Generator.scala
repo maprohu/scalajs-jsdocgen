@@ -17,6 +17,8 @@ object Generator {
   def generateFromFile(
     targetDir: File,
     docletsFile: File,
+    sourceFileRoot : URI,
+    sourcePubhlishRoot : URI,
     rootPackage : Seq[String] = Seq("jsfacade"),
     utilPackage : String = "pkg",
     implicits : Seq[String] = Seq("implicits")
@@ -26,6 +28,8 @@ object Generator {
     generateFromString(
       targetDir,
       Source.fromFile(docletsFile, "UTF-8").mkString,
+      sourceFileRoot,
+      sourcePubhlishRoot,
       rootPackage,
       utilPackage,
       implicits
@@ -39,6 +43,8 @@ object Generator {
   def generateFromString(
     targetDir: File,
     doclets: String,
+    sourceFileRoot : URI,
+    sourcePubhlishRoot : URI,
     rootPackage : Seq[String] = Seq("jsfacade"),
     utilPackage : String = "pkg",
     implicits : Seq[String] = Seq("implicits")
@@ -47,6 +53,8 @@ object Generator {
     generate(
       targetDir,
       readDoclets(doclets),
+      sourceFileRoot,
+      sourcePubhlishRoot,
       rootPackage,
       utilPackage,
       implicits
@@ -56,11 +64,13 @@ object Generator {
   def generate(
     targetDir: File,
     doclets: Seq[Doclet],
+    sourceFileRoot : URI,
+    sourcePubhlishRoot : URI,
     rootPackage : Seq[String] = Seq("jsfacade"),
     utilPackage : String = "pkg",
     implicits : Seq[String] = Seq("implicits")
   ) : Seq[File] = {
-    new Generator(targetDir, doclets, rootPackage, utilPackage, implicits).generated
+    new Generator(targetDir, doclets, sourceFileRoot, sourcePubhlishRoot, rootPackage, utilPackage, implicits).generated
   }
 
 }
@@ -77,11 +87,11 @@ object Generator {
 class Generator (
   targetDir: File,
   doclets: Seq[Doclet],
+  sourceFileRoot : URI,
+  sourcePubhlishRoot : URI,
   rootPackage : Seq[String] = Seq("jsfacade"),
   utilPackage : String = "pkg",
-  implicits : Seq[String] = Seq("implicits"),
-  sourceFileRoot : URI = new File("/home/marci/git/scalajs-o3d").toURI,
-  sourcePubhlishRoot : URI = new URL("https://github.com/maprohu/scalajs-o3d/blob/master/").toURI
+  implicits : Seq[String] = Seq("implicits")
 ) {
   val libPackage = "jsdocgen.lib"
   val unionClassName = libPackage + ".Union"
@@ -206,10 +216,20 @@ class Generator (
       case d : domain.Class => d
     })
 
+  val typeAliases = doclets
+    .collect({
+      case d : domain.Member if d.meta.code.value == "goog.typedef" => d
+    })
+
   val typedefs = doclets
     .collect({
       case d : domain.Typedef => d
+      case d : domain.Member if d.meta.code.value == "goog.typedef" => d
     })
+
+//  val typedefMemebers = doclets
+//    .collect({
+//    })
 
   val members = doclets
     .collect({
@@ -235,7 +255,8 @@ class Generator (
 //      if m.meta.code.value == "goog.typedef"
 //    } yield m
 
-  val typedefByName : Map[String, Typedef] = typedefs.map(td => td.longname -> td)(scala.collection.breakOut)
+  val typedefByName : Map[String, TypedefLike] = typedefs.map(td => td.longname -> td)(scala.collection.breakOut)
+  val typeAliasByName : Map[String, Member] = typeAliases.map(td => td.longname -> td)(scala.collection.breakOut)
 
   val (realTypedefs, functionTypedefs) = typedefs.partition(_.`type`.names != Seq("function"))
 
@@ -254,12 +275,21 @@ class Generator (
   }
 
 
-  val definedTypesByName : Map[String, ResolvedType] =
+  val definedTypesByNameMap : Map[String, ResolvedType] =
     (
       (classes ++ realTypedefs).map(dt => dt.longname -> SingleType(definedTypeRef(dt.longname)))
       ++
       functionTypedefs.map(dt => dt.longname -> SingleType(functionTypeRef(dt.longname)))
     )(breakOut)
+
+
+
+  val definedTypesByName : String => Option[ResolvedType] = { name =>
+    typeAliasByName
+      .get(name)
+      .map(ta => resolveUnion(ta.`type`))
+      .orElse(definedTypesByNameMap.get(name))
+  }
 
 
 
@@ -292,7 +322,7 @@ class Generator (
   def resolveDefined(name: String) : Option[ResolvedType] =
     unionTypedefs.get(name).map(resolveUnion(_))
       .orElse(
-        definedTypesByName.get(name)
+        definedTypesByName(name)
       )
 
 
@@ -309,8 +339,15 @@ class Generator (
         UnkownType(false)
       )
 
+  val typeNamePattern = """!?(.*)""".r
+
   def resolveUnion(t: domain.Type) : ResolvedType = {
-    t.names.map(n => resolve(n)).reduce(_ join _)
+    t.names.map({
+      case typeNamePattern(n) => n
+      case n => n
+    }).map(
+      resolve(_)
+    ).reduce(_ join _)
   }
 
 
@@ -358,6 +395,7 @@ class Generator (
     for {
       fn <- functionByParent(nsName)
     } {
+      write(s"// ${linkSource(fn.meta)}")
       if (isReserved(fn.name))
         write(s"""@scala.scalajs.js.annotation.JSName("${fn.name}")""")
       write(s"def ${id(fn.name)}(")
@@ -391,7 +429,14 @@ class Generator (
       if (isReserved(m))
         write(s"""@scala.scalajs.js.annotation.JSName("${m}")""")
       write(s"""  var ${id(m)} : ${packageJoin(ns :+ utilPackage)} = scala.scalajs.js.native""")
-
+    }
+    for {
+      ns <- classByParent(nsName)
+    } {
+      val m = ns.name
+      if (isReserved(m))
+        write(s"""@scala.scalajs.js.annotation.JSName("${m}")""")
+      write(s"""  var ${id(m)} : ${packageJoin((nsName :+ m) :+ "statics")} = scala.scalajs.js.native""")
     }
   }
 
@@ -435,7 +480,7 @@ class Generator (
     import out.write
 
     for {
-      m <- typedefByParent(nsName)
+      m <- typedefByParent(nsName).collect {case b:Typedef => b}
       if m.`type`.names == Seq("function")
     } {
       write(s"""type ${id(m.name)} = scala.scalajs.js.Function${m.params.size}[""")
@@ -468,6 +513,10 @@ class Generator (
     write(s"class ${cl.name} extends $superClass {")
     write("")
     writeClassMembers(cl, out.nest)
+    write(s"}")
+
+    write(s"object ${cl.name} {")
+    writeClassStaticMembers(cl, out.nest)
     write(s"}")
   }
 
@@ -527,9 +576,39 @@ class Generator (
 
   }
 
-  def writeTypedef(td: domain.Typedef, out: Out) = {
+  def writeClassStaticMembers(cl: domain.Class, out: Out) = {
     import out.write
 
+    for {
+      m <- typedefByParent(cl.splitName)
+    } {
+      write(s"type ${id(m.name)} = ${resolveUnion(m.`type`).toJsType}")
+    }
+
+    write(s"@scala.scalajs.js.native")
+    write(s"trait statics extends scala.scalajs.js.Object {")
+
+    val nest = out.nest
+    for {
+      m <- memberByParent(cl.splitName)
+      if m.access != "private" && m.scope == "static" && !m.name.endsWith("[undefined]")
+    } {
+      nest.write(s"// ${linkSource(m.meta)}")
+      if (isReserved(m.name))
+        nest.write(s"""@scala.scalajs.js.annotation.JSName("${m.name}")""")
+
+      nest.write(s"""var ${id(m.name)} : ${resolveType(m.`type`).toJsType} = scala.scalajs.js.native""")
+      nest.write("")
+    }
+
+    write(s"}")
+
+  }
+
+  def writeTypedef(td: domain.TypedefLike, out: Out) = {
+    import out.write
+
+    write(s"// ${linkSource(td.meta)}")
     write(s"@scala.scalajs.js.native")
     write(s"trait ${td.name} extends scala.scalajs.js.Object {")
 
@@ -639,8 +718,8 @@ class Generator (
 
   val traitFiles = for {
     ns <- namespaces
-    td <- typedefByParent(ns)
-    if td.`type`.names != Seq("function")
+    td <- typedefByParent(ns).collect {case x:Typedef => x}
+//    if td.`type`.names != Seq("function")
   } yield writeFile(td.longname) { out =>
     out.write(s"package ${packageJoin(ns)}")
     writeTypedef(td, out)
@@ -649,56 +728,79 @@ class Generator (
   val packageFiles = for {
     ns <- namespaces
   } yield writeFile((ns :+ utilPackage).mkString(".")) { out =>
-    import out.write
+    {
+      import out.write
 
-    write(s"package ${packageJoin(ns)}")
+      if (!ns.isEmpty) write(s"package ${packageJoin(ns.init)}")
 
-//    if (ns.isEmpty) {
-//      write("@scala.scalajs.js.native")
-//      write(s"object ${utilPackage} extends scala.scalajs.js.GlobalScope {")
-//      writeFunctionTypes(ns, out.nest)
-//    }
+      write(s"package object ${(rootPackage ++ ns).last} {")
+
+      val nest = out.nest
+
+      for {
+        m <- typedefByParent(ns)
+      } {
+        nest.write(s"// ${linkSource(m.meta)}")
+        nest.write(s"type ${id(m.name)} = ${resolveUnion(m.`type`).toJsType}")
+      }
+
+//      nest.write(s"object wrap {")
+//      val nest2 = out.nest
 //
-//    else {
-////        write(s"""@scala.scalajs.js.annotation.JSName("${ns.mkString(".")}")""")
-//      write(s"object ${utilPackage} extends {")
-//      writeFunctionTypes(ns, out.nest)
-//      write(s"}")
-//      write("@scala.scalajs.js.native")
-//      write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
-//    }
+//      for {
+//        m <- typedefByParent(ns)
+//      } {
+//        nest2.write(s"// ${linkSource(m.meta)}")
+//        nest2.write(s"type ${id(m.name)} = ${resolveUnion(m.`type`).toWrapperType}")
+//      }
+//
+//      nest.write(s"}")
 
-    if (ns.isEmpty) {
-      write(s"@scala.scalajs.js.native")
-      write(s"object global extends $utilPackage with scala.scalajs.js.GlobalScope {")
       write(s"}")
-      write(s"")
     }
 
-    write("@scala.scalajs.js.native")
-    write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
+    out.write(s"package ${(rootPackage ++ ns).last} {")
 
-    writeStatics(ns, out.nest)
+    {
+      val nest = out.nest
+      import nest.write
 
-    write(s"}")
+      if (ns.isEmpty) {
+        write(s"@scala.scalajs.js.native")
+        write(s"object global extends $utilPackage with scala.scalajs.js.GlobalScope {")
+        write(s"}")
+        write(s"")
+      }
 
-    write("")
+      write("@scala.scalajs.js.native")
+      write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
 
-    write(s"object $utilPackage {")
+      writeStatics(ns, out.nest)
 
-    writeFunctionTypes(ns, out.nest)
+      write(s"}")
 
-    write(s"  implicit class Wrapping(_wrapped_ : $utilPackage) {")
-    write(s"    def wrap = new Wrapper(_wrapped_)")
-    write(s"  }")
+      write("")
 
-    write(s"  class Wrapper(_wrapped_ : $utilPackage) {")
+      write(s"object $utilPackage {")
 
-    writeStaticsWrapper(ns, out.nest.nest)
+      writeFunctionTypes(ns, out.nest)
 
-    write(s"  }")
+      write(s"  implicit class Wrapping(_wrapped_ : $utilPackage) {")
+      write(s"    def wrap = new Wrapper(_wrapped_)")
+      write(s"  }")
 
-    write(s"}")
+      write(s"  class Wrapper(_wrapped_ : $utilPackage) {")
+
+      writeStaticsWrapper(ns, out.nest.nest)
+
+      write(s"  }")
+
+      write(s"}")
+    }
+
+    out.write(s"}")
+
+
 
   }
 

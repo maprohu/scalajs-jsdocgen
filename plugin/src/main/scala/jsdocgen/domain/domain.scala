@@ -25,7 +25,11 @@ case class Code(
   include = JsonTypeInfo.As.PROPERTY,
   property = "kind"
 )
-sealed trait Doclet
+sealed trait Doclet {
+  def name: String
+  val longname: String
+  def meta: Meta
+}
 
 trait HasParent {
   def memberof : String
@@ -36,13 +40,13 @@ trait HasAccess {
 }
 
 trait PackageMember extends HasParent {
-  def name: String
-  def meta: Meta
   def longname: String
 
   def splitName = longname.split('.')
 }
 
+
+trait TypedefLike extends Doclet
 
 
 trait HasType {
@@ -81,11 +85,12 @@ object UnknownType extends Type(
   undocumented: Boolean,
   inherited: Boolean,
   access : String = "public"
-) extends Doclet with HasParent with HasType with HasAccess
+) extends Doclet with HasParent with HasType with HasAccess with TypedefLike
 
 @key("namespace") case class Namespace(
   name: String,
   longname: String,
+  meta: Meta,
   memberof: String = null
 ) extends Doclet
 
@@ -135,25 +140,41 @@ trait HasReturns {
 @key("typedef") case class Typedef(
   name: String,
   longname: String,
+  meta: Meta,
   memberof: String = null,
   @JsonProperty("type") type_ : Type = UnknownType,
   @JsonProperty("params") params_ : Seq[Param] = Seq(),
   @JsonProperty("returns") returns_ : Seq[Return] = Seq()
-) extends Doclet with HasParent with DefinedType with HasType with HasParams with HasReturns
+) extends Doclet with HasParent with DefinedType with HasType with HasParams with HasReturns with TypedefLike
 
 @key("event") case class Event(
+  name:String,
+  longname: String,
+  meta: Meta
 ) extends Doclet
 
 @key("constant") case class Constant(
+  name:String,
+  longname: String,
+  meta: Meta
 ) extends Doclet
 
 @key("interface") case class Interface(
+  name:String,
+  longname: String,
+  meta: Meta
 ) extends Doclet
 
 @key("package") case class Package(
+  name:String,
+  longname: String,
+  meta: Meta
 ) extends Doclet
 
 @key("file") case class File(
+  name:String,
+  longname: String,
+  meta: Meta
 ) extends Doclet
 
 object pickle extends upickle.AttributeTagged {
