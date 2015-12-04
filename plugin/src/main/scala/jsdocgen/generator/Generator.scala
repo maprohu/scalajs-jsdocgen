@@ -305,7 +305,7 @@ class Generator (
   )
 
 
-  val arrayPattern1 = """Array\.<(.*)>""".r
+  val arrayPattern1 = """Array\.<!?(.*)>""".r
   val arrayPattern2 = """(.*)\[\]""".r
 
   def resolveArray(name:String) : Option[ResolvedType] = {
