@@ -56,8 +56,10 @@ trait HasType {
 
 case class Param(
   @JsonProperty("type") type_ : Type = UnknownType,
-  name: String
+  @JsonProperty("name") name_ : String
 ) extends HasType {
+
+  def name : String = Option(name_).getOrElse("unnamed_")
 
   def isOptional : Boolean = name.startsWith("opt_")
 
@@ -84,8 +86,12 @@ object UnknownType extends Type(
   scope: String,
   undocumented: Boolean,
   inherited: Boolean,
-  access : String = "public"
-) extends Doclet with HasParent with HasType with HasAccess with TypedefLike
+  @JsonProperty("access") access_ : String = "public"
+) extends Doclet with HasParent with HasType with HasAccess with TypedefLike {
+
+  def access = if (name.contains('.')) "private" else access_
+
+}
 
 @key("namespace") case class Namespace(
   name: String,
@@ -100,7 +106,7 @@ trait DefinedType {
 
 trait HasParams {
   def params_ : Seq[Param]
-  def params = Option(params_).getOrElse(Seq())
+  def params : Seq[Param] = Option(params_).getOrElse(Seq()).filter(!_.name.contains('.'))
 }
 
 trait HasReturns {
@@ -177,6 +183,12 @@ trait HasReturns {
   meta: Meta
 ) extends Doclet
 
+@key("module") case class Module(
+  name:String,
+  longname: String,
+  meta: Meta
+) extends Doclet
+
 object pickle extends upickle.AttributeTagged {
   def tagName = "kind"
 }
@@ -196,7 +208,8 @@ object JsonUtil {
     new NamedType(classOf[Interface], "interface"),
     new NamedType(classOf[Package], "package"),
     new NamedType(classOf[File], "file"),
-    new NamedType(classOf[Function], "function")
+    new NamedType(classOf[Function], "function"),
+    new NamedType(classOf[Module], "module")
   )
 
   def fromJson[T](json: String)(implicit m : Manifest[T]): T = {

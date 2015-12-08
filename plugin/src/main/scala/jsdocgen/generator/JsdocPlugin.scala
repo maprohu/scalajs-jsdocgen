@@ -14,6 +14,8 @@ object JsdocPlugin extends AutoPlugin {
 
     lazy val jsdocTarget = taskKey[File]("jsdoc-target")
 
+    lazy val jsdocWork = taskKey[File]("jsdoc-work")
+
     lazy val jsdocDocletsFile = taskKey[File]("jsdoc-docletsfile")
 
     lazy val jsdocRunTarget = settingKey[File]("jsdoc-runtarget")
@@ -71,6 +73,7 @@ object JsdocPlugin extends AutoPlugin {
     jsdocSourceFileRoot := jsdocRunSource.value.getOrElse(uri(".")),
     jsdocSourcePublishRoot := uri(s"https://github.com/maprohu/${name.value}/blob/master/facade/src/main/javascript/"),
     jsdocRunInputs := Seq("."),
+    jsdocWork := target.value / "jsdocgenwork",
     jsdocGenerate := {
       Generator.generateFromFile(
         jsdocTarget.value,
@@ -87,7 +90,7 @@ object JsdocPlugin extends AutoPlugin {
         jsdocRunSource.value.get,
         jsdocRunInputs.value,
         jsdocRunTarget.value,
-        target.value / "jsdocgenwork",
+        jsdocWork.value,
         jsdocCommand.value
       )
     }

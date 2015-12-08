@@ -106,7 +106,8 @@ class Generator (
   val keyword = Set(
     "type",
     "val",
-    "object"
+    "object",
+    "match"
   )
   def isReserved(name: String) = reserved.contains(name)
 
@@ -163,7 +164,7 @@ class Generator (
   }
   object OptionalType extends ResolvedType {
     def toSet = Set()
-    def toSingle = ???
+    def toSingle = "Unit"
 
     override def join(other: ResolvedType) = other match {
       case UnkownType(_) => UnkownType(true)
@@ -387,7 +388,6 @@ class Generator (
     def write(str: String) = out.println(indent(str, level))
     def nest = copy(level = level+1)
   }
-
 
   def writeStatics(nsName: Seq[String], out: Out) : Unit = {
     import out.write
