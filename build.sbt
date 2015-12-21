@@ -4,15 +4,17 @@ val jacksonVersion = "2.6.3"
 
 val commonSettings = Seq(
   organization := "com.github.maprohu",
-  version := "0.1.2-SNAPSHOT",
+  version := "0.1.2",
   publishMavenStyle := true,
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
     if (isSnapshot.value)
       Some("snapshots" at nexus + "content/repositories/snapshots")
     else
-      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+      Some(sbtglobal.SbtGlobals.devops)
+//      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
   },
+  credentials += sbtglobal.SbtGlobals.devopsCredentials,
   pomIncludeRepository := { _ => false },
   licenses := Seq("BSD-style" -> url("http://www.opensource.org/licenses/bsd-license.php")),
   homepage := Some(url(s"https://github.com/maprohu/${githubRepo}")),
