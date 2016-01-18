@@ -77,7 +77,6 @@ object Generator {
 
 /**
   * @see <a href="https://github.com/maprohu/scalajs-o3d/blob/master/facade/src/main/javascript/o3d-webgl/base.js#L50">source</a>
-  *
   * @param targetDir
   * @param doclets
   * @param rootPackage
@@ -93,6 +92,8 @@ class Generator (
   utilPackage : String = "pkg",
   implicits : Seq[String] = Seq("implicits")
 ) {
+
+
   val libPackage = "jsdocgen.lib"
   val unionClassName = libPackage + ".Union"
   val unionImplClass = libPackage + ".UnionImpl"
@@ -127,6 +128,9 @@ class Generator (
 
     uri
   }
+
+  def log(msg: String) = println(msg)
+  def log(msg: String, hasMeta: Doclet) = println(s"$msg - ${linkSource(hasMeta.meta)}")
 
   val unionClass = (rootPackage ++ implicits).mkString(".")
 
@@ -175,7 +179,7 @@ class Generator (
     // should not happen
     def optional = true
 //    def toWrapperType = ??? // should not happen
-    def toWrapperSingle = ???
+    def toWrapperSingle = "scala.scalajs.js.Any" // TODO check this
   }
   case class UnkownType(optional: Boolean) extends ResolvedType {
     def toSet = Set(jsAny)
@@ -210,6 +214,11 @@ class Generator (
   val functions = doclets
     .collect({
       case d : domain.Function => d
+    })
+
+  val interfaces = doclets
+    .collect({
+      case d : domain.Interface => d
     })
 
   val classes = doclets
@@ -247,6 +256,7 @@ class Generator (
   val namespaceByParent = realNamespaces.groupBy(_.init).withDefaultValue(Seq())
   val functionByParent = functions.groupBy(parentProp).withDefaultValue(Seq())
   val classByParent = classes.groupBy(parentProp).withDefaultValue(Seq())
+  val interfacesByParent = interfaces.groupBy(parentProp).withDefaultValue(Seq())
   val typedefByParent = typedefs.groupBy(parentProp).withDefaultValue(Seq())
   val memberByParent = members.groupBy(parentProp).withDefaultValue(Seq())
 
@@ -412,31 +422,40 @@ class Generator (
       write("")
     }
 
+    val subpackages = namespaceByParent(nsName)
+    val subpackageNames = subpackages.map(_.last).toSet
+
     for {
       m <- memberByParent(nsName)
-      if !m.inherited && !m.undocumented && m.scope == "static" && !m.name.endsWith("[undefined]")
+      if !m.inherited &&
+        !m.undocumented &&
+        m.scope == "static" &&
+        !m.name.endsWith("[undefined]") &&
+        !subpackageNames.contains(m.name)
     } {
+      write(s"// ${linkSource(m.meta)}")
       if (isReserved(m.name))
         write(s"""@scala.scalajs.js.annotation.JSName("${m.name}")""")
-      write(s"""var ${id(m.name)} : ${resolveType(m.`type`).toJsType} = scala.scalajs.js.native""")
+      write(s"""val ${id(m.name)} : ${resolveType(m.`type`).toJsType} = scala.scalajs.js.native""")
     }
 
-
+    write("// subpackages")
     for {
-      ns <- namespaceByParent(nsName)
+      ns <- subpackages
     } {
       val m = ns.last
       if (isReserved(m))
         write(s"""@scala.scalajs.js.annotation.JSName("${m}")""")
-      write(s"""  var ${id(m)} : ${packageJoin(ns :+ utilPackage)} = scala.scalajs.js.native""")
+      write(s"""val ${id(m)} : ${packageJoin(ns :+ utilPackage)} = scala.scalajs.js.native""")
     }
     for {
       ns <- classByParent(nsName)
     } {
+      write(s"// ${linkSource(ns.meta)}")
       val m = ns.name
       if (isReserved(m))
         write(s"""@scala.scalajs.js.annotation.JSName("${m}")""")
-      write(s"""  var ${id(m)} : ${packageJoin((nsName :+ m) :+ "statics")} = scala.scalajs.js.native""")
+      write(s"""val ${id(m)} : ${packageJoin((nsName :+ m) :+ "statics")} = scala.scalajs.js.native""")
     }
   }
 
@@ -446,6 +465,8 @@ class Generator (
     for {
       fn <- functionByParent(nsName)
     } {
+      log(s"    writing staticsWrapper: ${fn}", fn)
+
       write(s"// ${linkSource(fn.meta)}")
       if (isReserved(fn.name))
         write(s"""@scala.scalajs.js.annotation.JSName("${fn.name}")""")
@@ -522,6 +543,23 @@ class Generator (
     write(s"}")
   }
 
+  def writeInterface(cl: domain.Interface, out: Out) = {
+    import out.write
+
+    write(s"// ${linkSource(cl.meta)}")
+    write(s"@scala.scalajs.js.native")
+    write( s"""@scala.scalajs.js.annotation.JSName("${cl.longname}")""")
+
+    val superClass: String =
+        "scala.scalajs.js.Object"
+
+    write(s"trait ${cl.name} extends $superClass {")
+    write("")
+    writeInterfaceMembers(cl, out.nest)
+    write(s"}")
+
+  }
+
   def writeClassMembers(cl: domain.Class, out: Out) = {
     import out.write
 
@@ -535,19 +573,10 @@ class Generator (
       write(") = this()")
       write("")
     }
+  }
 
-
-    for {
-      m <- memberByParent(cl.splitName)
-      if m.access != "private" && !m.inherited && !m.undocumented && m.scope == "instance" && !m.name.endsWith("[undefined]")
-    } {
-      write(s"// ${linkSource(m.meta)}")
-      if (isReserved(m.name))
-        write(s"""@scala.scalajs.js.annotation.JSName("${m.name}")""")
-
-      write(s"""var ${id(m.name)} : ${resolveType(m.`type`).toJsType} = scala.scalajs.js.native""")
-      write("")
-    }
+  def writeInterfaceMembers(cl: domain.Interface, out: Out) = {
+    import out.write
 
     for {
       fn <- functionByParent(cl.splitName)
@@ -587,13 +616,22 @@ class Generator (
       write(s"type ${id(m.name)} = ${resolveUnion(m.`type`).toJsType}")
     }
 
+    for {
+      m <- classByParent(cl.splitName)
+      if m.access != "private"
+    } {
+      write(s"// ${linkSource(m.meta)}")
+      write(s"@scala.scalajs.js.native")
+      write(s"trait ${id(m.name)} extends scala.scalajs.js.Object")
+    }
+
     write(s"@scala.scalajs.js.native")
     write(s"trait statics extends scala.scalajs.js.Object {")
 
     val nest = out.nest
     for {
       m <- memberByParent(cl.splitName)
-      if m.access != "private" && m.scope == "static" && !m.name.endsWith("[undefined]")
+      if m.access != "private" && m.scope == "static" && !m.name.endsWith("[undefined]") && !m.undocumented
     } {
       nest.write(s"// ${linkSource(m.meta)}")
       if (isReserved(m.name))
@@ -704,20 +742,33 @@ class Generator (
 
   def writeFile(longname: String)(writer: Out => Unit) = {
     val file = sourceFile(longname)
+    println(s"  writing file: ${file}")
     val pw = new PrintWriter(file)
     writer(Out(pw, 0))
     pw.close()
     file
   }
 
+  log("classFiles")
   val classFiles = for {
     ns <- namespaces
     cl <- classByParent(ns)
   } yield writeFile(cl.longname) { out =>
-      out.write(s"package ${packageJoin(ns)}")
-      writeClass(cl, out)
+    out.write(s"package ${packageJoin(ns)}")
+    writeClass(cl, out)
   }
 
+  log("interfaceFiles")
+  val interfaceFiles = for {
+    ns <- namespaces
+    cl <- interfacesByParent(ns)
+  } yield writeFile(cl.longname) { out =>
+      out.write(s"package ${packageJoin(ns)}")
+      writeInterface(cl, out)
+  }
+
+
+  log("traitFiles")
   val traitFiles = for {
     ns <- namespaces
     td <- typedefByParent(ns).collect {case x:Typedef => x}
@@ -727,6 +778,7 @@ class Generator (
     writeTypedef(td, out)
   }
 
+  log("packageFiles")
   val packageFiles = for {
     ns <- namespaces
   } yield writeFile((ns :+ utilPackage).mkString(".")) { out =>
@@ -777,7 +829,7 @@ class Generator (
       write("@scala.scalajs.js.native")
       write(s"trait ${utilPackage} extends scala.scalajs.js.Object {")
 
-      writeStatics(ns, out.nest)
+      writeStatics(ns, nest.nest)
 
       write(s"}")
 
@@ -815,6 +867,7 @@ class Generator (
 //      write("")
 //    }
 
+  log("implicitsFile")
   val implicitsFile = writeFile(implicits.mkString(".")) { out =>
     import out.write
 
@@ -827,7 +880,7 @@ class Generator (
     write("")
   }
 
-  val generated = classFiles ++ traitFiles ++ packageFiles :+ implicitsFile
+  val generated = classFiles ++ interfaceFiles ++ traitFiles ++ packageFiles :+ implicitsFile
 //  val generated = classFiles ++ traitFiles ++ packageFiles
 
 

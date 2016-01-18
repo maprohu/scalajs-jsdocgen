@@ -31,10 +31,11 @@ object JsdocInvoker {
     out.getParentFile.mkdirs()
     val dir = s()
 
+    println(s"jsdoc source base directory: ${dir}")
     (
       jsdoc ++
       jsdocOptions ++
-      jsdocInputs.map(new File(dir, _).getAbsolutePath)
+      jsdocInputs.map { input => val f = new File(dir, input).getCanonicalPath ; println(s"jsdoc source: ${f}") ; f }
     ) #> out !
 
     println("jsdoc complete.")

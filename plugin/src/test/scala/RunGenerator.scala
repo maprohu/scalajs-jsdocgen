@@ -13,12 +13,11 @@ import scala.io.Source
   */
 object RunGenerator extends App {
 
-
    Generator.generateFromString(
      new File("target/generated"),
-     Source.fromURL(getClass.getResource("/ol3-3.10.1-jsdoc.json").toURI.toURL, "UTF-8").mkString,
-     new File("D:\\git\\ol3").toURI,
-     new URL("https://github.com/openlayers/ol3/blob/master/").toURI
+     Source.fromURL(getClass.getResource("/ol3-3.11.1-jsdoc.json").toURI.toURL, "UTF-8").mkString,
+     new File("D:\\\\git\\\\scalajs-ol3\\\\facade\\\\target\\\\jsdocgenwork\\\\d71ffeca6dc3732b93a5\\\\ol3").toURI,
+     new URL("https://github.com/openlayers/ol3/blob/v3.11.1/").toURI
    )
 
  }

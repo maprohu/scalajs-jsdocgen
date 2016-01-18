@@ -136,6 +136,7 @@ trait HasReturns {
   scope: String,
   longname: String,
   meta : Meta,
+  access: String = "public",
   @JsonProperty("params") params_ : Seq[Param] = Seq(),
   @JsonProperty("augments") augments_ : Seq[String] = Seq()
 ) extends Doclet with PackageMember with DefinedType with HasParams {
@@ -168,8 +169,10 @@ trait HasReturns {
 @key("interface") case class Interface(
   name:String,
   longname: String,
+  memberof: String = null,
+  scope: String,
   meta: Meta
-) extends Doclet
+) extends Doclet with PackageMember
 
 @key("package") case class Package(
   name:String,
