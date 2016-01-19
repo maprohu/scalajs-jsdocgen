@@ -29,6 +29,7 @@ sealed trait Doclet {
   def name: String
   val longname: String
   def meta: Meta
+  def ignore : Boolean = false
 }
 
 trait HasParent {
@@ -86,10 +87,12 @@ object UnknownType extends Type(
   scope: String,
   undocumented: Boolean,
   inherited: Boolean,
-  @JsonProperty("access") access_ : String = "public"
+  @JsonProperty("access") access_ : String = "public",
+  @JsonProperty("ignore") ignore_ : Boolean = false
 ) extends Doclet with HasParent with HasType with HasAccess with TypedefLike {
 
   def access = if (name.contains('.')) "private" else access_
+  override def ignore = Option(ignore_).getOrElse(false)
 
 }
 
@@ -123,11 +126,15 @@ trait HasReturns {
   undocumented: Boolean,
   inherited: Boolean,
   `override`: Boolean,
+  @JsonProperty("implements") implements_ : Seq[String] = Seq(),
   @JsonProperty("overrides") overrides_ : String,
   @JsonProperty("params") params_ : Seq[Param] = Seq(),
-  @JsonProperty("returns") returns_ : Seq[Return] = Seq()
+  @JsonProperty("returns") returns_ : Seq[Return] = Seq(),
+  @JsonProperty("ignore") ignore_ : Boolean = false
 ) extends Doclet with PackageMember with HasParams with HasReturns {
   def overrides = Option(overrides_)
+  override def ignore = Option(ignore_).getOrElse(false)
+  def implements = Option(implements_).getOrElse(Seq())
 }
 
 @key("class") case class Class(
@@ -137,10 +144,12 @@ trait HasReturns {
   longname: String,
   meta : Meta,
   access: String = "public",
+  @JsonProperty("implements") implements_ : Seq[String] = Seq(),
   @JsonProperty("params") params_ : Seq[Param] = Seq(),
   @JsonProperty("augments") augments_ : Seq[String] = Seq()
-) extends Doclet with PackageMember with DefinedType with HasParams {
-  def augments = Option(augments_).getOrElse(Seq()).headOption
+) extends Doclet with PackageMember with DefinedType with HasParams with HasAccess {
+  def augments : Option[String] = Option(augments_).getOrElse(Seq()).headOption
+  def implements = Option(implements_).getOrElse(Seq())
 }
 
 
@@ -171,8 +180,9 @@ trait HasReturns {
   longname: String,
   memberof: String = null,
   scope: String,
+  access: String = "public",
   meta: Meta
-) extends Doclet with PackageMember
+) extends Doclet with PackageMember with HasAccess
 
 @key("package") case class Package(
   name:String,

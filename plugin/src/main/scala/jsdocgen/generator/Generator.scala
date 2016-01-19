@@ -169,6 +169,7 @@ class Generator (
   object OptionalType extends ResolvedType {
     def toSet = Set()
     def toSingle = "Unit"
+    override def toJsType : String = "Unit"
 
     override def join(other: ResolvedType) = other match {
       case UnkownType(_) => UnkownType(true)
@@ -213,7 +214,7 @@ class Generator (
 
   val functions = doclets
     .collect({
-      case d : domain.Function => d
+      case d : domain.Function if !d.ignore => d
     })
 
   val interfaces = doclets
@@ -243,7 +244,7 @@ class Generator (
 
   val members = doclets
     .collect({
-      case d : domain.Member => d
+      case d : domain.Member if !d.ignore => d
     })
 
 
@@ -273,7 +274,7 @@ class Generator (
 
   val unionTypedefs : Map[String, Type] =
     realTypedefs.collect({
-      case td:Typedef if td.`type` != null && !td.`type`.names.isEmpty =>
+      case td:Typedef if td.`type` != null && !td.`type`.names.isEmpty && td.`type`.names != Seq("Object") =>
         td.longname -> td.`type`
     })(breakOut)
 
@@ -288,7 +289,7 @@ class Generator (
 
   val definedTypesByNameMap : Map[String, ResolvedType] =
     (
-      (classes ++ realTypedefs).map(dt => dt.longname -> SingleType(definedTypeRef(dt.longname)))
+      (classes ++ interfaces ++ realTypedefs).map(dt => dt.longname -> SingleType(definedTypeRef(dt.longname)))
       ++
       functionTypedefs.map(dt => dt.longname -> SingleType(functionTypeRef(dt.longname)))
     )(breakOut)
@@ -521,6 +522,8 @@ class Generator (
 
   }
 
+
+
   def writeClass(cl: domain.Class, out: Out) = {
     import out.write
 
@@ -533,7 +536,9 @@ class Generator (
         .flatMap(au => resolveDefined(au).map(_.toJsType))
         .headOption.getOrElse("scala.scalajs.js.Object")
 
-    write(s"class ${cl.name} extends $superClass {")
+    val imps = cl.implements.flatMap(au => resolveDefined(au).map(_.toJsType).toSeq)
+
+    write(s"class ${cl.name} extends ${(superClass +: imps).mkString(" with ")} {")
     write("")
     writeClassMembers(cl, out.nest)
     write(s"}")
@@ -553,6 +558,7 @@ class Generator (
     val superClass: String =
         "scala.scalajs.js.Object"
 
+//    write(s"trait ${cl.name} {")
     write(s"trait ${cl.name} extends $superClass {")
     write("")
     writeInterfaceMembers(cl, out.nest)
@@ -571,7 +577,37 @@ class Generator (
         }).mkString(",\n")
       )
       write(") = this()")
+
       write("")
+
+      for {
+        fn <- functionByParent(cl.splitName)
+        if !fn.undocumented && !fn.inherited && !fn.`override` && fn.overrides.isEmpty && fn.scope == "instance"
+      } {
+        write(s"// ${linkSource(fn.meta)}")
+        if (isReserved(fn.name))
+          write(s"""@scala.scalajs.js.annotation.JSName("${fn.name}")""")
+
+        val defStart0 = s"def ${id(fn.name)}("
+
+        val defStart = if (fn.implements.isEmpty) defStart0 else s"override $defStart0"
+
+        val defParams =
+          (for { p <- fn.params } yield {
+            s"\n  ${id(p.name)} : ${resolveParam(p).toJsParamType}"
+          }).mkString(",")
+
+        val defEnd = s") : ${resolveReturn(fn.returns).toJsType} = scala.scalajs.js.native"
+
+        if (defParams.isEmpty) {
+          write(defStart + defEnd)
+        } else {
+          write(defStart + defParams)
+          write(defEnd)
+        }
+
+        write("")
+      }
     }
   }
 
@@ -594,6 +630,7 @@ class Generator (
         }).mkString(",")
 
       val defEnd = s") : ${resolveReturn(fn.returns).toJsType} = scala.scalajs.js.native"
+//      val defEnd = s") : ${resolveReturn(fn.returns).toJsType}"
 
       if (defParams.isEmpty) {
         write(defStart + defEnd)
@@ -617,7 +654,7 @@ class Generator (
     }
 
     for {
-      m <- classByParent(cl.splitName)
+      m <- classByParent(cl.splitName) ++ interfacesByParent(cl.splitName)
       if m.access != "private"
     } {
       write(s"// ${linkSource(m.meta)}")

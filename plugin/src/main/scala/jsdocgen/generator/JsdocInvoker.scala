@@ -35,7 +35,17 @@ object JsdocInvoker {
     (
       jsdoc ++
       jsdocOptions ++
-      jsdocInputs.map { input => val f = new File(dir, input).getCanonicalPath ; println(s"jsdoc source: ${f}") ; f }
+      jsdocInputs.map { input =>
+        val inputFile = new File(input)
+
+        val f =
+          if (inputFile.isAbsolute) input else
+          new File(dir, input).getCanonicalPath
+
+        println(s"jsdoc source: ${f}")
+
+        f
+      }
     ) #> out !
 
     println("jsdoc complete.")
