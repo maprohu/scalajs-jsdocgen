@@ -772,6 +772,7 @@ class Generator (
   val traitFiles = for {
     ns <- namespaces
     td <- typedefByParent(ns).collect {case x:Typedef => x}
+    if td.`type`.names == Seq("Object")
 //    if td.`type`.names != Seq("function")
   } yield writeFile(td.longname) { out =>
     out.write(s"package ${packageJoin(ns)}")
@@ -793,6 +794,7 @@ class Generator (
 
       for {
         m <- typedefByParent(ns)
+        if m.`type`.names != Seq("Object")
       } {
         nest.write(s"// ${linkSource(m.meta)}")
         nest.write(s"type ${id(m.name)} = ${resolveUnion(m.`type`).toJsType}")
