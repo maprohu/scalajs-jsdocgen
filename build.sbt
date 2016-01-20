@@ -52,32 +52,32 @@ lazy val plugin = project
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
       "com.lihaoyi" %% "upickle" % "0.3.6",
       "org.scalamacros" %% "quasiquotes" % "2.0.0" % "provided"
-    ),
-    resourceGenerators in Compile += Def.task {
-      val out = (resourceManaged in Compile).value / "jsdocgen" / "plugin.properties"
-      IO.write(out,
-      s"""organization = ${organization.value}
-          |lib.name = ${(name in lib).value}
-          |version = ${version.value}
-      """.stripMargin
-      )
-      Seq(out)
-    }.taskValue
+    )
+//    resourceGenerators in Compile += Def.task {
+//      val out = (resourceManaged in Compile).value / "jsdocgen" / "plugin.properties"
+//      IO.write(out,
+//      s"""organization = ${organization.value}
+//          |lib.name = ${(name in lib).value}
+//          |version = ${version.value}
+//      """.stripMargin
+//      )
+//      Seq(out)
+//    }.taskValue
 
 
   )
 
 
-lazy val lib = project
-  .settings(commonSettings)
-  .enablePlugins(ScalaJSPlugin)
-  .settings(
-    name := "jsdocgen-lib",
-    publishArtifact in (Compile, packageDoc) := false,
-    scalaVersion := "2.11.7"
-  )
+//lazy val lib = project
+//  .settings(commonSettings)
+//  .enablePlugins(ScalaJSPlugin)
+//  .settings(
+//    name := "jsdocgen-lib",
+//    publishArtifact in (Compile, packageDoc) := false,
+//    scalaVersion := "2.11.7"
+//  )
 
 
 lazy val root = (project in file("."))
   .settings(noPublish)
-  .aggregate(plugin, lib)
+  .aggregate(plugin)
