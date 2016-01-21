@@ -904,7 +904,7 @@ class Generator (
 
       val t11 = for {
         m <- typedefByParent(ns)
-        if m.`type`.names != Seq("Object")
+        if m.`type`.names != Seq("Object") && m.`type`.names != Seq("function")
       } yield {
         nest.write(s"// ${linkSource(m.meta)}")
         val t = resolveUnion(m.`type`)
@@ -953,7 +953,7 @@ class Generator (
 
       write(s"object $utilPackage {")
 
-      val t22 = writeFunctionTypes(ns, out.nest)
+      val t22 = writeFunctionTypes(ns, nest.nest)
 
 //      write(s"  implicit class Wrapping(_wrapped_ : $utilPackage) {")
 //      write(s"    def wrap = new Wrapper(_wrapped_)")
