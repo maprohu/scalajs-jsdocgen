@@ -315,7 +315,9 @@ class Generator (
     "number" -> SingleType("scala.Double"),
     "Element" -> SingleType("org.scalajs.dom.raw.Element"),
     "HTMLCanvas" -> SingleType("org.scalajs.dom.raw.HTMLCanvasElement"),
+    "boolean" -> SingleType("scala.Boolean"),
     "undefined" -> OptionalType
+
   )
 
 
